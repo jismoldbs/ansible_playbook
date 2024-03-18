@@ -1,0 +1,77 @@
+---
+- name: Deploy Apache Docker Container using Ansible
+  hosts: linux
+  become: true
+  become_method: sudo
+  tasks:
+    # Task to install pip (Python package manager) on Debian-based systems
+    - name: Install pip (Python package manager) on Debian-based systems
+      package:
+        name: python3-pip
+        state: present
+      when: ansible_distribution == "Ubuntu" or ansible_distribution == "Debian"
+
+    # Task to install Docker Python library
+    - name: Install Docker Python library
+      pip:
+        name: docker
+        state: present
+
+    # Task to install Docker on Debian-based systems
+    - name: Install Docker (Debian)
+      apt:
+        name: docker.io
+        state: present
+      when: ansible_os_family == "Debian"
+
+    # Task to start Docker Daemon on Debian-based systems
+    - name: Starting Docker Daemon (Debian)
+      service:
+        name: docker
+        state: started
+      when: ansible_os_family == "Debian"
+
+    # Task to pull Apache Docker Image
+    - name: Pull Apache Docker Image
+      docker_image:
+        name: httpd
+        tag: latest
+        source: pull
+      register: z
+
+    # Task to create a persistence Volume Directory
+    - name: Creating a persistence Volume Directory
+      file:
+        path: "/home/ec2-user/httpd"
+        state: directory
+
+    # Task to copy index.html to host directory
+    - name: Copy index.html to host directory
+      # Modify the source path of index.html as needed
+      copy:
+        src: "/home/jismol/ansible_playbook/index.html"  # Modify this path as needed
+        dest: "/home/ec2-user/httpd/index.html"
+
+    # Task to configure Networking for Apache Container
+    - name: Configure Networking for Apache Container
+      docker_network:
+        name: apache_network
+        driver: bridge
+        ipam_config:
+          - subnet: "172.168.10.0/30"
+
+    # Task to run Apache Docker Container
+    - name: Run Apache Docker Container
+      docker_container:
+        name: apache-httpd
+        image: httpd
+        state: started
+        restart_policy: always
+        exposed_ports:
+          - "80"
+        ports:
+          - "80:80"
+        volumes:
+          - "/home/ec2-user/httpd:/usr/local/apache2/htdocs"
+        networks:
+          - name: apache_network
